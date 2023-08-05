@@ -1,81 +1,90 @@
-//Esse script usa as bibliotecas abaixo
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-//Função ???
 public class PlayerMovement : MonoBehaviour
 {
-    //As linhas abaixo criam variáveis com os Components usados no personagem
-    private Rigidbody2D rb; //Atribui "rb" como uma variável do Component: Rigidbody2D
-    private SpriteRenderer sprite; //Atribui "sprite" como uma variável do Component: SpriteRenderer
-    private Animator animator; //Atribui "animator" como uma variável do Component: Animator
+    #region VARIABLES / REFERENCES
+    public Rigidbody2D playerRigidbody2D;
+    public Animator animator;
+    private Vector2 moveDir;
+    public float moveSpeed;
+    public float runSpeed;
+    public float crawlSpeed;
 
-    //As linhas abaixo criam variáveis de movimento do personagem
-    private float dirX; //Cria "dirX" como uma variável do tipo float
-    [SerializeField] private float moveSpeed = 7f; //[Unity cria um campo customizável no Editor] Cria "moveSpeed" como uma variável do tipo float e aplica o valor base de 7f (float)
-    [SerializeField] private float jumpForce = 10f; //[Unity cria um campo customizável no Editor] Cria "jumpForce" como uma variável do tipo float e aplica o valor base de 10f
+    [HideInInspector] public bool isRunning;
+    [HideInInspector] public bool isCrawling;
+    [HideInInspector] public bool isDucking;
+    #endregion
 
-    //Essa função atribui valores int sequenciais em uma lista string de nome MovementState
-    private enum MovementState
+    #region FUNCTIONS
+    void Update()
     {
-        idle, running, jumping, falling //sempre que MovementState for idle, então MovementState.idle = 0, (...)
+        InputManagement();
     }
 
-    //Essa função é iniciada antes do primeiro frame, retorna nada para o programa e apenas pode ser acessada por esse script
-    private void Start()
+    private void FixedUpdate()
     {
-        rb = GetComponent<Rigidbody2D>(); //A variável "rb" acessa o Component "Rigidbody2D"
-        sprite = GetComponent<SpriteRenderer>();//A variável "sprite" acessa o Component "SpriteRenderer"
-        animator = GetComponent<Animator>();//A variável "animator" acessa o Component "Animator"
+        Move();
+    }
+    #endregion
+
+    #region METHODS
+    private void InputManagement()
+    {
+        moveDir.x = Input.GetAxisRaw("Horizontal");
+        moveDir.y = Input.GetAxisRaw("Vertical");
+
+        animator.SetFloat("Horizontal", moveDir.x);
+        animator.SetFloat("Vertical", moveDir.y);
+        animator.SetFloat("Speed", moveDir.sqrMagnitude);
     }
 
-    //Essa função é atualizada a cada frame, retorna nada para o programa e apenas pode ser acessada por esse script
-    private void Update()
+    private void Move()
     {
-        dirX = Input.GetAxisRaw("Horizontal");//Define à variável "dirX" como Input (entrada do usuário) o eixo "Horizontal" do teclado : por padrão, a Unity define "eixo horizontal" como as setas esquerda e direita ou A e D, sendo esquerda/A = -1 e direita/D = +1; nenhuma tecla acionada = 0
-        rb.velocity = new Vector2(dirX * moveSpeed, rb.velocity.y);//Define velocidade linear à variável "rb" como uma nova entrada de vetor 2D, onde X = "dirX" multiplicado pela variável "moveSpeed", e Y= velocidade do eixo Y no momento que o eixo é acionado
+        playerRigidbody2D.MovePosition(playerRigidbody2D.position + moveDir.normalized * moveSpeed * Time.fixedDeltaTime);
+        PlayerRunning();
+        PlayerCrawling();
+        PlayerDuck();
+    }
 
-        if (Input.GetButtonDown("Jump")) //Se o usuário pressionar a tecla "Barra de Espaço" ; o programa manda apenas uma entrada mesmo se o usuário segurar a tecla
+    private void PlayerRunning()
+    {
+        if (Input.GetKey(KeyCode.LeftShift))
         {
-            rb.velocity = new Vector2(rb.velocity.x, jumpForce); //a velocidade linear da variável "rb" passa a ser: X = velocidade do "rb" no eixo X no momento em que a tecla é apertada e Y = variável "jumpForce"
+            playerRigidbody2D.MovePosition(playerRigidbody2D.position + moveDir.normalized * runSpeed * Time.fixedDeltaTime);
+            isRunning = true;
         }
+        else
+        {
+            isRunning = false;
+        }
+    }
 
-        UpdateAnimationState(); //Executa a função de Estado da Animação
+    private void PlayerCrawling()
+    {
+        if (Input.GetKey(KeyCode.LeftControl))
+        {
+            playerRigidbody2D.MovePosition(playerRigidbody2D.position + moveDir.normalized * crawlSpeed * Time.fixedDeltaTime);
+            isCrawling = true;
+        }
+        else
+        {
+            isCrawling = false;
+        }
 
     }
 
-    //Essa função cria os estados de movimento e animação, retorna nada para o programa e apenas pode ser acessada por esse script
-    private void UpdateAnimationState()
+    private void PlayerDuck()
     {
-        MovementState state; //Define a função enum MovimentState como a variável local "state", usada apenas nessa função do código
-
-        if (dirX > 0f) //se a variável "dirX" for maior que 0, portando, direita/D
+        if (Input.GetKey(KeyCode.LeftControl))
         {
-            state = MovementState.running; //Define a variável "state" como MovementState.running, portanto, state = 1
-            sprite.flipX = false; //No Component "SpriteRenderer" define a boolean flipX como "false" (box desclicado)
+            isDucking = true;
         }
-
-        else if (dirX < 0f) //também se a variável "dirX" for menor que 0, portanto, esquerda/A
+        else
         {
-            state = MovementState.running; //Define a variável "state" como MovementState.running, portanto, state = 1
-            sprite.flipX = true; //No Component "SpriteRenderer" define a boolean flipX como "true" (box clicado)
+            isDucking = false;
         }
-
-        else //e se dirX = 0
-        {
-            state = MovementState.idle; //Define a variável "state" como MovementState.running, portanto, state = 0
-        }
-
-        if (rb.velocity.y > 0.01f) //se a velocidade do eixo Y do "rb" for maior que 0.01f, portando, pra cima
-        {
-            state = MovementState.jumping; //Define a variável "state" como MovementState.running, portanto, state = 2
-        }
-        else if (rb.velocity.y < -0.01f) //se a velocidade do eixo Y do "rb" for menor que 0.01f, portando, pra baixo
-        {
-            state = MovementState.falling; //Define a variável "state" como MovementState.running, portanto, state = 3
-        }
-
-        animator.SetInteger("state", (int)state); //o Component "Animator" ajusta o parâmetro int "state" (criado na aba Animator do Editor), para o valor atual do int "state" (MovementState)
     }
+    #endregion
 }
